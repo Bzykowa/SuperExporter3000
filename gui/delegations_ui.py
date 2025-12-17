@@ -9,24 +9,36 @@ class DelegationsUI(tk.Frame):
     def __init__(self, master=None, controller=None):
         super().__init__(master)
         self.controller = controller
+        self.rowconfigure((0, 1, 2), weight=1)
+        self.columnconfigure((0, 1), weight=1)
+        self.no_file_message = "Nie wybrano pliku/folderu"
         self.setup()
 
     def setup(self):
         """Shape the menu component"""
         # Components
-        self.lbl_choose_file = tk.Label(
-            self, text="Plik z delegacjami do zaimportowania"
-        )
         self.lbl_path_to_dels = tk.Label(
-            self, text="Nie wybrano pliku", fg="grey")
+            self, text=self.no_file_message, fg="grey")
         self.btn_choose_file = tk.Button(
-            self, text="Wybierz plik", command=self.get_path)
+            self, text="Wybierz plik/folder", command=self.get_path)
+        self.btn_check_file = tk.Button(
+            self, text="Skanuj", command=self.check_file
+        )
+        self.lbl_scan_dels = tk.Label(
+            self, text="Sprawdź delegacje względem najpopularniejszych błędów"
+        )
+        self.lbl_file_errors = tk.Label(
+            self, text=self.no_file_message, fg="grey"
+        )
         # Placement
-        self.lbl_choose_file.grid(
-            row=0, column=0, sticky="nw", padx=10, pady=5)
         self.lbl_path_to_dels.grid(
-            row=1, column=0, sticky="nw", padx=10, pady=10)
-        self.btn_choose_file.grid(row=1, column=1, sticky="e", padx=10)
+            row=0, column=0, sticky="w", padx=10, pady=10)
+        self.btn_choose_file.grid(row=0, column=1, sticky="ew", padx=10)
+        self.lbl_scan_dels.grid(
+            row=1, column=0, sticky="w", padx=10, pady=10)
+        self.btn_check_file.grid(row=1, column=1, sticky="ew", padx=10)
+        self.lbl_file_errors.grid(
+            row=2, column=0, sticky="w", padx=10, pady=10)
 
     def get_path(self):
         """Open a window searching for an Excel file and update
@@ -40,3 +52,11 @@ class DelegationsUI(tk.Frame):
             return
 
         self.lbl_path_to_dels["text"] = f"{filepath}"
+        self.lbl_file_errors["text"] = ""
+
+    def check_file(self):
+        """Scan the chosen delegations file for common errors and list
+        them for user."""
+        if self.lbl_path_to_dels["text"] == self.no_file_message:
+            self.lbl_file_errors["text"] = self.no_file_message
+            return

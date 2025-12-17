@@ -9,19 +9,17 @@ class MainWindow(tk.Frame):
 
     def __init__(self, master=None, controller=None):
         super().__init__(master)
-        self.pack()
         self.setup()
 
     def setup(self):
         """Shape the main window"""
-        self.master.title("SuperImporter3000")
-        self.master.rowconfigure(0, weight=1, minsize=800)
-        self.master.columnconfigure(1, weight=1, minsize=800)
+        self.columnconfigure((0, 1), weight=1)
+        self.rowconfigure(0, weight=1)
         self.frames = {}
 
         # Add main menu
         self.frames[MainMenu] = MainMenu(self, self)
-        self.frames[MainMenu].grid(row=0, column=0, sticky="ns")
+        self.frames[MainMenu].grid(row=0, column=0, sticky="nsew")
         # Add side frames
         self.frames[DelegationsUI] = DelegationsUI(self)
         self.frames[DelegationsUI].grid(row=0, column=1, sticky="nsew")

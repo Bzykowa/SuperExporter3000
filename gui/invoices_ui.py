@@ -9,24 +9,22 @@ class InvoicesUI(tk.Frame):
     def __init__(self, master=None, controller=None):
         super().__init__(master)
         self.controller = controller
+        self.rowconfigure((0), weight=1)
+        self.columnconfigure((0, 1), weight=1)
         self.setup()
 
     def setup(self):
         """Shape the menu component"""
         # Components
-        self.lbl_choose_file = tk.Label(
-            self, text="Plik z fakturami do zaimportowania"
-        )
         self.lbl_path_to_invs = tk.Label(
             self, text="Nie wybrano pliku", fg="grey")
         self.btn_choose_file = tk.Button(
             self, text="Wybierz plik", command=self.get_path)
         # Placement
-        self.lbl_choose_file.grid(
-            row=0, column=0, sticky="nw", padx=10, pady=5)
         self.lbl_path_to_invs.grid(
-            row=1, column=0, sticky="nw", padx=10, pady=10)
-        self.btn_choose_file.grid(row=1, column=1, sticky="e", padx=10)
+            row=0, column=0, sticky="w", padx=10, pady=10)
+        self.btn_choose_file.grid(
+            row=0, column=1, sticky="ew", padx=10, pady=10)
 
     def get_path(self):
         """Open a window searching for an Excel file and update

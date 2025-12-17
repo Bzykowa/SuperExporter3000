@@ -10,6 +10,8 @@ class MainMenu(tk.Frame):
     def __init__(self, master=None, controller=None):
         super().__init__(master)
         self.controller = controller
+        self.rowconfigure((0, 1), weight=1)
+        self.columnconfigure(0, weight=1)
         self.setup()
 
     def setup(self):
@@ -21,8 +23,9 @@ class MainMenu(tk.Frame):
         self.btn_invoice = tk.Button(
             self, text="Faktury", command=self.open_inv_ui)
         # Placement
-        self.btn_delegation.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
-        self.btn_invoice.grid(row=1, column=0, sticky="ew", padx=5)
+        self.btn_delegation.grid(
+            row=0, column=0, sticky="ew", padx=15, pady=5)
+        self.btn_invoice.grid(row=1, column=0, sticky="ew", padx=15, pady=5)
 
     def open_del_ui(self):
         """Show the frame containing delegation import components."""
