@@ -28,7 +28,10 @@ class XMLParser(ABC):
         """
         rough_string = parser.tostring(self.root, 'utf-8')
         reparsed = minidom.parseString(rough_string)
-        return reparsed.toprettyxml(indent="  ")
+        final = reparsed.toprettyxml(indent="  ")
+        final = final.replace("&lt;", "<")
+        final = final.replace("&gt;", ">")
+        return final
 
     def cdata_wrap(self, data):
         """Return data wrapped in cdata tag."""

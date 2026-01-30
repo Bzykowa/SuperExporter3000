@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
+from xml_parsing.delegations import Delegations
 
 
 class DelegationsUI(tk.Frame):
@@ -30,6 +31,10 @@ class DelegationsUI(tk.Frame):
         self.lbl_file_errors = tk.Label(
             self, text=self.no_file_message, fg="grey"
         )
+        self.btn_generate_file = tk.Button(
+            self, text="Generuj xml",  state="disabled",
+            command=self.generate_xml
+        )
         # Placement
         self.lbl_path_to_dels.grid(
             row=0, column=0, sticky="w", padx=10, pady=10)
@@ -39,6 +44,9 @@ class DelegationsUI(tk.Frame):
         self.btn_check_file.grid(row=1, column=1, sticky="ew", padx=10)
         self.lbl_file_errors.grid(
             row=2, column=0, sticky="w", padx=10, pady=10)
+        self.btn_generate_file.grid(
+            row=3, column=1, padx=10, pady=10, sticky="ew"
+        )
 
     def get_path(self):
         """Open a window searching for an Excel file and update
@@ -59,4 +67,16 @@ class DelegationsUI(tk.Frame):
         them for user."""
         if self.lbl_path_to_dels["text"] == self.no_file_message:
             self.lbl_file_errors["text"] = self.no_file_message
-            return
+            self.btn_generate_file["state"] = "disabled"
+        else:
+            self.btn_generate_file["state"] = "active"
+
+    def generate_xml(self):
+        """Create xml file with data extracted from submitted excel file"""
+        test_id = "AcMed"
+        test_output = "C:\\SuperImporter\\SuperExporter3000\\test_files\\" + \
+            "export_{}.xml".format(test_id)
+        exporter = Delegations(test_id, self.lbl_path_to_dels["text"])
+        exporter.gen_xml_layout()
+        with open(test_output, "wb") as output:
+            output.write(exporter.formatted_print().encode('utf-8'))
