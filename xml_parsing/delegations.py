@@ -18,6 +18,7 @@ class Delegations(XMLParser):
             header=None, keep_default_na=False, dtype={
                 0: str, 1: str}
         )
+        self.data[35] = self.data[35].map(self.excel_text_number_to_float)
 
     def gen_xml_layout(self):
         """

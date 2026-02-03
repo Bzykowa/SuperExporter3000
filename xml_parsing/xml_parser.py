@@ -36,3 +36,9 @@ class XMLParser(ABC):
     def cdata_wrap(self, data):
         """Return data wrapped in cdata tag."""
         return "<![CDATA[{}]]>".format(data)
+
+    def excel_text_number_to_float(self, x: str):
+        """Change num from x xxx,xx to a float"""
+        result = x.replace(" ", "")
+        result = result.replace(",", ".")
+        return float(result)
