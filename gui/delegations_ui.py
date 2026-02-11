@@ -94,7 +94,8 @@ class DelegationsUI(tk.Frame):
         for file in exports:
             exporter = Delegations(file[0], file[1])
             exporter.gen_xml_layout()
-            output_path = str(path.joinpath(
+            out_path = path if self.directory_mode else path.parent
+            output_path = str(out_path.joinpath(
                 "export_{}.xml".format(file[0])).resolve())
 
             with open(output_path, "wb") as output:
