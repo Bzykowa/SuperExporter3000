@@ -9,17 +9,25 @@ class Delegations(XMLParser):
 
     def __init__(self, company_code: str, data_path: str):
         super().__init__(company_code, data_path)
-        # read the data from submitted file
         self.read_data()
 
     def read_data(self):
         self.data = pd.read_excel(
             self.data_path, sheet_name="do 30", decimal=",", skiprows=1,
             header=None, keep_default_na=False, dtype={
-                0: str, 1: str},
-            parse_dates=[9, 10, 16, 17, 18, 19, 20, 21, 36, 38],
-            thousands=" "
+                0: str, 1: str}, thousands=" "
         )
+        # date casting bullshit
+        self.data[9] = pd.to_datetime(self.data[9], format="mixed")
+        self.data[10] = pd.to_datetime(self.data[10], format="mixed")
+        self.data[16] = pd.to_datetime(self.data[16], format="mixed")
+        self.data[17] = pd.to_datetime(self.data[17], format="mixed")
+        self.data[18] = pd.to_datetime(self.data[18], format="mixed")
+        self.data[19] = pd.to_datetime(self.data[19], format="mixed")
+        self.data[20] = pd.to_datetime(self.data[20], format="mixed")
+        self.data[21] = pd.to_datetime(self.data[21], format="mixed")
+        self.data[36] = pd.to_datetime(self.data[36], format="mixed")
+        self.data[38] = pd.to_datetime(self.data[38], format="mixed")
 
     def gen_xml_layout(self):
         """
@@ -40,6 +48,7 @@ class Delegations(XMLParser):
             for row in self.data.itertuples(index=False, name="Delegation")
         ]
 
+        # filter rows with no client
         out = [d for d in delegations if d is not None]
 
         self.records.extend(out)
