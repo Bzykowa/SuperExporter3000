@@ -16,9 +16,10 @@ class Delegations(XMLParser):
         self.data = pd.read_excel(
             self.data_path, sheet_name="do 30", decimal=",", skiprows=1,
             header=None, keep_default_na=False, dtype={
-                0: str, 1: str}
+                0: str, 1: str},
+            parse_dates=[9, 10, 16, 17, 18, 19, 20, 21, 36, 38],
+            thousands=" "
         )
-        self.data[35] = self.data[35].map(self.excel_text_number_to_float)
 
     def gen_xml_layout(self):
         """
@@ -39,13 +40,19 @@ class Delegations(XMLParser):
             for row in self.data.itertuples(index=False, name="Delegation")
         ]
 
-        self.records.extend(delegations)
+        out = [d for d in delegations if d is not None]
+
+        self.records.extend(out)
 
     def gen_delegation_xml(self, row: tuple):
         """
         Generate xml element for a delegation record
         """
         # todo: figure out if the order of tags matters
+        # skip if no client specified
+        if row._0 == "":
+            return
+
         # main tag
         delegation = parser.Element("DOKUMENT_INNY_ROZCHOD")
 
