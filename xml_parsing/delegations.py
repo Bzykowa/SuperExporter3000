@@ -84,7 +84,7 @@ class Delegations(XMLParser):
         data_wplywu = parser.SubElement(delegation, "DATA_WPLYWU")
         data_wplywu.text = self.cdata_wrap(row._18.strftime("%d.%m.%Y"))
         numer = parser.SubElement(delegation, "NUMER")
-        numer.text = self.cdata_wrap(row._2)
+        numer.text = self.cdata_wrap("")
         numer_obcy = parser.SubElement(delegation, "NUMER_OBCY")
         numer_obcy.text = self.cdata_wrap(row._4)
         rejestr = parser.SubElement(delegation, "REJESTR")
@@ -193,10 +193,10 @@ class Delegations(XMLParser):
             (row._36 + pd.Timedelta(days=7)).strftime("%d.%m.%Y")
         )
         forma_platnosci_plat = parser.SubElement(
-            delegation, "FORMA_PLATNOSCI_PLAT")
+            platnosc, "FORMA_PLATNOSCI_PLAT")
         forma_platnosci_plat.text = self.cdata_wrap("przelew")
         forma_platnosci_id_plat = parser.SubElement(
-            delegation, "FORMA_PLATNOSCI_ID_PLAT")
+            platnosc, "FORMA_PLATNOSCI_ID_PLAT")
         forma_platnosci_id_plat.text = self.cdata_wrap("")
         kwota_plat = parser.SubElement(platnosc, "KWOTA_PLAT")
         kwota_plat.text = self.cdata_wrap(row._23)
@@ -208,7 +208,7 @@ class Delegations(XMLParser):
             platnosc, "NOTOWANIE_WALUTY_ILE_PLAT")
         notowanie_waluty_ile_plat.text = self.cdata_wrap(row._30)
         notowanie_waluty_za_ile_plat = parser.SubElement(
-            delegation, "NOTOWANIE_WALUTY_ZA_ILE_PLAT")
+            platnosc, "NOTOWANIE_WALUTY_ZA_ILE_PLAT")
         notowanie_waluty_za_ile_plat.text = self.cdata_wrap("1")
         kwota_pln_plat = parser.SubElement(platnosc, "KWOTA_PLN_PLAT")
         kwota_pln_plat.text = self.cdata_wrap(row._35)
@@ -234,10 +234,10 @@ class Delegations(XMLParser):
         platnosc_podmiot = parser.SubElement(platnosc, "PLATNOSC_PODMIOT")
         platnosc_podmiot.text = self.cdata_wrap(row._0)
         platnosc_podmiot_id = parser.SubElement(
-            delegation, "PLATNOSC_PODMIOT_ID")
+            platnosc, "PLATNOSC_PODMIOT_ID")
         platnosc_podmiot_id.text = self.cdata_wrap("")
         platnosc_podmiot_nip = parser.SubElement(
-            delegation, "PLATNOSC_PODMIOT_NIP")
+            platnosc, "PLATNOSC_PODMIOT_NIP")
         platnosc_podmiot_nip.text = self.cdata_wrap("")
         plat_kategoria = parser.SubElement(platnosc, "PLAT_KATEGORIA")
         plat_kategoria.text = self.cdata_wrap("DELEGACJE ZAGR. OP")
@@ -259,7 +259,7 @@ class Delegations(XMLParser):
         """
         Set the date of eur to pln exchange for a delegation
         """
-        exchange_date = date - \
-            pd.Timedelta(days=3) if date.weekday == 0 else date - \
-            pd.Timedelta(days=1)
-        return exchange_date.strftime("%d.%m.%Y")
+        if date.weekday() == 0:
+            return (date - pd.Timedelta(days=3)).strftime("%d.%m.%Y")
+        else:
+            return (date - pd.Timedelta(days=1)).strftime("%d.%m.%Y")
