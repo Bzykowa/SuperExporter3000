@@ -1,0 +1,405 @@
+import pandas as pd
+import xml.etree.ElementTree as parser
+from xml_parsing.xml_parser import XMLParser
+
+
+class Invoices(XMLParser):
+    """The class responsible for parsing invoices in Excel files to xml
+    file in Optima format."""
+
+    def __init__(
+        self, company_code: str, data_path: str,
+        exchange_rates: dict, holidays: list
+    ):
+        """
+        Invoices parser constructor
+
+        :param company_code: Short code for a company in Optima
+        :type company_code: str
+        :param data_path: A path to a directory containing files to export
+        :type data_path: str
+        :param exchange_rates: A dict with data from NBP API EUR to PLN
+        :type exchange_rates: dict
+        :param holidays: A list of dates for holidays (no exchange rate)
+        :type holidays: list
+        """
+        super().__init__(company_code, data_path)
+        self.client_data = pd.DataFrame(
+            columns=[
+                "Kod", "Nazwa", "Nazwa2", "Nazwa3", "Telefon", "Telefon2",
+                "TelefonSms", "Fax", "Ulica", "NrDomu", "NrLokalu",
+                "KodPocztowy", "Poczta", "Miasto", "Kraj", "Wojewodztwo",
+                "Powiat", "Gmina", "URL", "Grupa", "OsobaFizyczna", "NIP",
+                "NIPKraj", "Zezwolenie", "Regon", "Pesel", "Email",
+                "BankRachunekNr", "BankNazwa", "Osoba", "Opis", "Rodzaj",
+                "PlatnikVAT", "PodatnikVatCzynny", "Eksport", "LimitKredytu",
+                "Termin", "FormaPlatnosci", "Ceny", "CenyNazwa", "Upust",
+                "NieNaliczajOdsetek", "MetodaKasowa", "WindykacjaEMail",
+                "WindykacjaTelefonSms", "AlgorytmNettoBrutto", "Waluta"
+            ]
+        )
+        self.invoice_data = pd.DataFrame(
+            columns=[
+                "Numer", "DataWystawienia", "Kwota",
+                "KwotaEUR", "DataKursu"
+            ]
+        )
+        self.exchange_data = exchange_rates
+        self.holiday_data = holidays
+
+        self.read_data()
+
+    def read_data(self):
+        """
+        Extract data from invoices (Excel files in data_path directory)
+        """
+        self.verify_data()
+        raise NotImplementedError
+
+    def gen_xml_layout(self):
+        """
+        Generate the layout for delegation records.
+        """
+        # todo: figure out how to make many files (max_record = 500)
+        self.records = parser.SubElement(self.root, "REJESTRY_SPRZEDAZY_VAT")
+        self.records.set("xmlns", "")
+
+        version = parser.SubElement(self.records, "WERSJA")
+        version.text = self.cdata_wrap("2.00")
+        zdr_id = parser.SubElement(self.records, "BAZA_ZRD_ID")
+        zdr_id.text = self.cdata_wrap(self.company_code)
+        doc_id = parser.SubElement(self.records, "BAZA_DOC_ID")
+        doc_id.text = self.cdata_wrap(self.company_code)
+
+        invoices = [
+            self.gen_invoice_record(idx)
+            for idx in range(len(self.invoice_data))
+        ]
+
+        self.records.extend(invoices)
+
+    def gen_invoice_record(self, idx: int):
+        """
+        Generate a record for an invoice
+
+        :param idx: Id of the document in exported data
+        :type idx: int
+        """
+        # main tag
+        invoice = parser.Element("REJESTR_SPRZEDAZY_VAT")
+
+        # document type
+        id_zrodla = parser.SubElement(invoice, "ID_ZRODLA")
+        id_zrodla.text = self.cdata_wrap("")
+        modul = parser.SubElement(invoice, "MODUL")
+        modul.text = self.cdata_wrap("Rejestr Vat")
+        typ = parser.SubElement(invoice, "TYP")
+        typ.text = self.cdata_wrap("Rejestr sprzedazy")
+        rejestr = parser.SubElement(invoice, "TYP")
+        rejestr.text = self.cdata_wrap("SPRZEDAŻ")
+
+        # document's data
+        data_wystawienia = parser.SubElement(invoice, "DATA_WYSTAWIENIA")
+        data_wystawienia.text = self.cdata_wrap(
+            self.invoice_data.at(idx, "DataWystawienia").strftime("%d.%m.%Y"))
+        data_sprzedazy = parser.SubElement(invoice, "DATA_SPRZEDAZY")
+        data_sprzedazy.text = self.cdata_wrap(
+            self.invoice_data.at(idx, "DataWystawienia").strftime("%d.%m.%Y"))
+        termin = parser.SubElement(invoice, "TERMIN")
+        termin.text = self.cdata_wrap(
+            (self.invoice_data.at(idx, "DataWystawienia") +
+             pd.Timedelta(days=7)).strftime("%d.%m.%Y")
+        )
+        data_obowiazku_podatkowego = parser.SubElement(
+            invoice, "DATA_DATAOBOWIAZKUPODATKOWEGO")
+        data_obowiazku_podatkowego.text = self.cdata_wrap(
+            self.invoice_data.at(idx, "DataWystawienia").strftime("%d.%m.%Y"))
+        data_prawa_odliczenia = parser.SubElement(
+            invoice, "DATA_DATAPRAWAODLICZENIA")
+        data_prawa_odliczenia.text = self.cdata_wrap(
+            self.invoice_data.at(idx, "DataWystawienia").strftime("%d.%m.%Y"))
+        numer = parser.SubElement(invoice, "NUMER")
+        numer.text = self.cdata_wrap(self.invoice_data.at(idx, "Numer"))
+        korekta = parser.SubElement(invoice, "KOREKTA")
+        korekta.text = self.cdata_wrap("Nie")
+        korekta_numer = parser.SubElement(invoice, "KOREKTA_NUMER")
+        korekta_numer.text = self.cdata_wrap("")
+        wewnetrzna = parser.SubElement(invoice, "WEWNETRZNA")
+        wewnetrzna.text = self.cdata_wrap("Nie")
+        metoda_kasowa = parser.SubElement(invoice, "METODA_KASOWA")
+        metoda_kasowa.text = self.cdata_wrap("Nie")
+        fiskalna = parser.SubElement(invoice, "FISKALNA")
+        fiskalna.text = self.cdata_wrap("Nie")
+        detaliczna = parser.SubElement(invoice, "DETALICZNA")
+        detaliczna.text = self.cdata_wrap("Nie")
+        eksport = parser.SubElement(invoice, "EKSPORT")
+        eksport.text = self.cdata_wrap("Nie")
+        finalny = parser.SubElement(invoice, "FINALNY")
+        finalny.text = self.cdata_wrap("Nie")
+
+        # client's data
+        podatnik_czynny = parser.SubElement(invoice, "PODATNIK_CZYNNY")
+        podatnik_czynny.text = self.cdata_wrap("Tak")
+        identyfikator_księgowy = parser.SubElement(
+            invoice, "IDENTYFIKATOR_KSIEGOWY")
+        identyfikator_księgowy.text = self.cdata_wrap("")
+        typ_podmiotu = parser.SubElement(invoice, "TYP_PODMIOTU")
+        typ_podmiotu.text = self.cdata_wrap("kontrahent")
+        podmiot = parser.SubElement(invoice, "PODMIOT")
+        podmiot.text = self.cdata_wrap(self.client_data.at(idx, "Kod"))
+        podmiot_id = parser.SubElement(invoice, "PODMIOT_ID")
+        podmiot_id.text = self.cdata_wrap("")
+        podmiot_nip = parser.SubElement(invoice, "PODMIOT_NIP")
+        podmiot_nip.text = self.cdata_wrap("")
+        nazwa1 = parser.SubElement(invoice, "NAZWA1")
+        nazwa1.text = self.cdata_wrap(
+            " ".join(self.client_data.at(idx, "Nazwa").split()))
+        nazwa2 = parser.SubElement(invoice, "NAZWA2")
+        nazwa2.text = self.cdata_wrap("")
+        nazwa3 = parser.SubElement(invoice, "NAZWA3")
+        nazwa3.text = self.cdata_wrap("")
+        nip_kraj = parser.SubElement(invoice, "NIP_KRAJ")
+        nip_kraj.text = self.cdata_wrap("")
+        nip = parser.SubElement(invoice, "NIP")
+        nip.text = self.cdata_wrap("")
+
+        # client's address
+        kraj = parser.SubElement(invoice, "KRAJ")
+        kraj.text = self.cdata_wrap(self.client_data.at(idx, "Kraj"))
+        wojewodztwo = parser.SubElement(invoice, "WOJEWODZTWO")
+        wojewodztwo.text = self.cdata_wrap("")
+        powiat = parser.SubElement(invoice, "POWIAT")
+        powiat.text = self.cdata_wrap("")
+        gmina = parser.SubElement(invoice, "GMINA")
+        gmina.text = self.cdata_wrap("")
+        ulica = parser.SubElement(invoice, "ULICA")
+        ulica.text = self.cdata_wrap(self.client_data.at(idx, "Ulica"))
+        nr_domu = parser.SubElement(invoice, "NR_DOMU")
+        nr_domu.text = self.cdata_wrap(self.client_data.at(idx, "NrDomu"))
+        nr_lokalu = parser.SubElement(invoice, "NR_LOKALU")
+        nr_lokalu.text = self.cdata_wrap("")
+        miasto = parser.SubElement(invoice, "MIASTO")
+        miasto.text = self.cdata_wrap(self.client_data.at(idx, "Miasto"))
+        kod_pocztowy = parser.SubElement(invoice, "KOD_POCZTOWY")
+        kod_pocztowy.text = self.cdata_wrap(
+            self.client_data.at(idx, "KodPocztowy"))
+        poczta = parser.SubElement(invoice, "POCZTA")
+        poczta.text = self.cdata_wrap(self.client_data.at(idx, "Miasto"))
+        dodatkowe = parser.SubElement(invoice, "DODATKOWE")
+        dodatkowe.text = self.cdata_wrap("")
+        pesel = parser.SubElement(invoice, "PESEL")
+        pesel.text = self.cdata_wrap("")
+        rolnik = parser.SubElement(invoice, "ROLNIK")
+        rolnik.text = self.cdata_wrap("Nie")
+
+        # payment's data
+        typ_platnika = parser.SubElement(invoice, "TYP_PLATNIKA")
+        typ_platnika.text = self.cdata_wrap("kontrahent")
+        platnik = parser.SubElement(invoice, "PLATNIK")
+        platnik.text = self.cdata_wrap(self.client_data.at(idx, "Kod"))
+        platnik_id = parser.SubElement(invoice, "PLATNIK_ID")
+        platnik_id.text = self.cdata_wrap("")
+        platnik_nip = parser.SubElement(invoice, "PLATNIK_NIP")
+        platnik_nip.text = self.cdata_wrap("")
+        platnik_rachunek_nr = parser.SubElement(invoice, "PLATNIK_RACHUNEK_NR")
+        platnik_rachunek_nr.text = self.cdata_wrap("DE92480501610015540842")
+        kategoria = parser.SubElement(invoice, "KATEGORIA")
+        kategoria.text = self.cdata_wrap("USŁUGI")
+        kategoria_id = parser.SubElement(invoice, "KATEGORIA_ID")
+        kategoria_id.text = self.cdata_wrap("")
+        opis = parser.SubElement(invoice, "OPIS")
+        opis.text = self.cdata_wrap("Usługi opiekuńcze")
+        forma_platnosci = parser.SubElement(invoice, "FORMA_PLATNOSCI")
+        forma_platnosci.text = self.cdata_wrap("przelew")
+        forma_platnosci_id = parser.SubElement(
+            invoice, "FORMA_PLATNOSCI_ID")
+        forma_platnosci_id.text = self.cdata_wrap("")
+        deklaracja_vat7 = parser.SubElement(invoice, "DEKLARACJA_VAT7")
+        deklaracja_vat7.text = self.cdata_wrap(
+            self.invoice_data.at(idx, "DataWystawienia").strftime("%Y-%m")
+        )
+        deklaracja_vatue = parser.SubElement(invoice, "DEKLARACJA_VATUE")
+        deklaracja_vatue.text = self.cdata_wrap("Nie")
+        waluta = parser.SubElement(invoice, "WALUTA")
+        waluta.text = self.cdata_wrap("EUR")
+        kurs_waluty = parser.SubElement(invoice, "KURS_WALUTY")
+        kurs_waluty.text = self.cdata_wrap("NBP")
+        notowanie_waluty_ile = parser.SubElement(
+            invoice, "NOTOWANIE_WALUTY_ILE")
+        notowanie_waluty_ile.text = self.cdata_wrap(
+            self.exchange_data[self.invoice_data.at(
+                idx, "DataKursu").strftime("%Y-%m-%d")]
+        )
+        notowanie_waluty_za_ile = parser.SubElement(
+            invoice, "NOTOWANIE_WALUTY_ZA_ILE")
+        notowanie_waluty_za_ile.text = self.cdata_wrap("1")
+        data_kursu = parser.SubElement(invoice, "DATA_KURSU")
+        data_kursu.text = self.cdata_wrap(
+            self.invoice_data.at(idx, "DataKursu").strftime("%Y-%m-%d"))
+        kurs_do_ksiegowania = parser.SubElement(invoice, "KURS_DO_KSIEGOWANIA")
+        kurs_do_ksiegowania.text = self.cdata_wrap("Nie")
+        kurs_waluty2 = parser.SubElement(invoice, "KURS_WALUTY2")
+        kurs_waluty2.text = self.cdata_wrap("NBP")
+        notowanie_waluty_ile2 = parser.SubElement(
+            invoice, "NOTOWANIE_WALUTY_ILE2")
+        notowanie_waluty_ile2.text = self.cdata_wrap(
+            self.exchange_data[self.invoice_data.at(
+                idx, "DataKursu").strftime("%Y-%m-%d")]
+        )
+        notowanie_waluty_za_ile2 = parser.SubElement(
+            invoice, "NOTOWANIE_WALUTY_ZA_ILE2")
+        notowanie_waluty_za_ile2.text = self.cdata_wrap("1")
+        data_kursu2 = parser.SubElement(invoice, "DATA_KURSU2")
+        data_kursu2.text = self.cdata_wrap(
+            self.invoice_data.at(idx, "DataKursu").strftime("%Y-%m-%d"))
+        platnosc_vat_w_pln = parser.SubElement(invoice, "PLATNOSC_VAT_W_PLN")
+        platnosc_vat_w_pln.text = self.cdata_wrap("Nie")
+        akcyza_za_wegiel = parser.SubElement(invoice, "AKCYZA_NA_WEGIEL")
+        akcyza_za_wegiel.text = self.cdata_wrap(0)
+        akcyza_za_wegiel_kolumna_kpr = parser.SubElement(
+            invoice, "AKCYZA_NA_WEGIEL_KOLUMNA_KPR")
+        akcyza_za_wegiel_kolumna_kpr.text = self.cdata_wrap("nie księgować")
+        jpk_fa = parser.SubElement(invoice, "JPK_FA")
+        jpk_fa.text = self.cdata_wrap("Tak")
+        deklaracja_vat27 = parser.SubElement(invoice, "DEKLARACJA_VAT27")
+        deklaracja_vat27.text = self.cdata_wrap("Nie")
+
+        # invoice positions
+        pozycje = parser.SubElement(invoice, "POZYCJE")
+        pozycja = parser.SubElement(pozycje, "POZYCJA")
+        kategoria_pos = parser.SubElement(pozycja, "KATEGORIA_POS")
+        kategoria_pos.text = self.cdata_wrap("USŁUGI")
+        kategoria_id_pos = parser.SubElement(pozycja, "KATEGORIA_ID_POS")
+        kategoria_id_pos.text = self.cdata_wrap("")
+        stawka_vat = parser.SubElement(pozycja, "STAWKA_VAT")
+        stawka_vat.text = self.cdata_wrap(0)
+        status_vat = parser.SubElement(pozycja, "STATUS_VAT")
+        status_vat.text = self.cdata_wrap("zwolniona")
+        netto = parser.SubElement(pozycja, "NETTO")
+        netto.text = self.cdata_wrap(self.invoice_data.at(idx, "KwotaEUR"))
+        vat = parser.SubElement(pozycja, "VAT")
+        vat.text = self.cdata_wrap(0)
+        netto_sys = parser.SubElement(pozycja, "NETTO_SYS")
+        netto_sys.text = self.cdata_wrap(self.invoice_data.at(idx, "Kwota"))
+        vat_sys = parser.SubElement(pozycja, "VAT_SYS")
+        vat_sys.text = self.cdata_wrap(0)
+        netto_sys2 = parser.SubElement(pozycja, "NETTO_SYS2")
+        netto_sys2.text = self.cdata_wrap(self.invoice_data.at(idx, "Kwota"))
+        vat_sys2 = parser.SubElement(pozycja, "VAT_SYS2")
+        vat_sys2.text = self.cdata_wrap(0)
+        rodzaj_sprzedazy = parser.SubElement(pozycja, "RODZAJ_SPRZEDAZY")
+        rodzaj_sprzedazy.text = self.cdata_wrap("usługi")
+        uwz_w_proporcji = parser.SubElement(pozycja, "UWZ_W_PROPORCJI")
+        uwz_w_proporcji.text = self.cdata_wrap("warunkowo")
+        kolumna_kpr = parser.SubElement(pozycja, "KOLUMNA_KPR")
+        kolumna_kpr.text = self.cdata_wrap("Sprzedaż")
+        kolumna_ryczalt = parser.SubElement(pozycja, "KOLUMNA_RYCZALT")
+        kolumna_ryczalt.text = self.cdata_wrap("Nie księgować")
+        opis_poz = parser.SubElement(pozycja, "OPIS_POZ")
+        opis_poz.text = self.cdata_wrap("Usługi opiekuńcze")
+        opis_poz2 = parser.SubElement(pozycja, "OPIS_POZ2")
+        opis_poz2.text = self.cdata_wrap("")
+
+        parser.SubElement(invoice, "KWOTY_DODATKOWE")
+
+        # payments' data section
+        # payments' main tag
+        platnosci = parser.SubElement(invoice, "PLATNOSCI")
+        # payment's main tag
+        platnosc = parser.SubElement(platnosci, "PLATNOSC")
+
+        # other data
+        id_zrodla_platnosci = parser.SubElement(platnosc, "ID_ZRODLA_PLAT")
+        id_zrodla_platnosci.text = self.cdata_wrap("")
+        termin_plat = parser.SubElement(platnosc, "TERMIN_PLAT")
+        termin_plat.text = self.cdata_wrap(
+            (self.invoice_data.at(idx, "DataWystawienia") +
+             pd.Timedelta(days=7)).strftime("%d.%m.%Y")
+        )
+        forma_platnosci_plat = parser.SubElement(
+            platnosc, "FORMA_PLATNOSCI_PLAT")
+        forma_platnosci_plat.text = self.cdata_wrap("przelew")
+        forma_platnosci_id_plat = parser.SubElement(
+            platnosc, "FORMA_PLATNOSCI_ID_PLAT")
+        forma_platnosci_id_plat.text = self.cdata_wrap("")
+        kwota_plat = parser.SubElement(platnosc, "KWOTA_PLAT")
+        kwota_plat.text = self.cdata_wrap(
+            self.invoice_data.at(idx, "KwotaEUR"))
+        waluta_plat = parser.SubElement(platnosc, "WALUTA_PLAT")
+        waluta_plat.text = self.cdata_wrap("EUR")
+        kurs_waluty_plat = parser.SubElement(platnosc, "KURS_WALUTY_PLAT")
+        kurs_waluty_plat.text = self.cdata_wrap("NBP")
+        notowanie_waluty_ile_plat = parser.SubElement(
+            platnosc, "NOTOWANIE_WALUTY_ILE_PLAT")
+        notowanie_waluty_ile_plat.text = self.cdata_wrap(
+            self.exchange_data[self.invoice_data.at(
+                idx, "DataKursu").strftime("%Y-%m-%d")]
+        )
+        notowanie_waluty_za_ile_plat = parser.SubElement(
+            platnosc, "NOTOWANIE_WALUTY_ZA_ILE_PLAT")
+        notowanie_waluty_za_ile_plat.text = self.cdata_wrap("1")
+        kwota_pln_plat = parser.SubElement(platnosc, "KWOTA_PLN_PLAT")
+        kwota_pln_plat.text = self.cdata_wrap(
+            self.invoice_data.at(idx, "Kwota"))
+        kierunek = parser.SubElement(platnosc, "KIERUNEK")
+        kierunek.text = self.cdata_wrap("przychód")
+        podlega_rozliczeniu = parser.SubElement(
+            platnosc, "PODLEGA_ROZLICZENIU")
+        podlega_rozliczeniu.text = self.cdata_wrap("tak")
+        konto = parser.SubElement(platnosc, "KONTO")
+        konto.text = self.cdata_wrap("")
+        nie_naliczaj_odsetek = parser.SubElement(
+            platnosc, "NIE_NALICZAJ_ODSETEK")
+        nie_naliczaj_odsetek.text = self.cdata_wrap("Nie")
+        przelew_sepa = parser.SubElement(platnosc, "PRZELEW_SEPA")
+        przelew_sepa.text = self.cdata_wrap("Nie")
+        data_kursu_plat = parser.SubElement(platnosc, "DATA_KURSU_PLAT")
+        data_kursu_plat.text = self.cdata_wrap(
+            self.invoice_data.at(idx, "DataKursu").strftime("%Y-%m-%d"))
+        waluta_dok_plat = parser.SubElement(platnosc, "WALUTA_DOK_PLAT")
+        waluta_dok_plat.text = self.cdata_wrap("EUR")
+        platnosc_typ_podmiotu = parser.SubElement(
+            platnosc, "PLATNOSC_TYP_PODMIOTU")
+        platnosc_typ_podmiotu.text = self.cdata_wrap("kontrahent")
+        platnosc_podmiot = parser.SubElement(platnosc, "PLATNOSC_PODMIOT")
+        platnosc_podmiot.text = self.cdata_wrap(
+            self.client_data.at(idx, "Kod"))
+        platnosc_podmiot_id = parser.SubElement(
+            platnosc, "PLATNOSC_PODMIOT_ID")
+        platnosc_podmiot_id.text = self.cdata_wrap("")
+        platnosc_podmiot_nip = parser.SubElement(
+            platnosc, "PLATNOSC_PODMIOT_NIP")
+        platnosc_podmiot_nip.text = self.cdata_wrap("")
+        platnosc_podmiot_rachunek_nr = parser.SubElement(
+            platnosc, "PLATNOSC_PODMIOT_RACHUNEK_NR")
+        platnosc_podmiot_rachunek_nr.text = self.cdata_wrap(
+            "DE92480501610015540842")
+        plat_kategoria = parser.SubElement(platnosc, "PLAT_KATEGORIA")
+        plat_kategoria.text = self.cdata_wrap("USŁUGI")
+        plat_kategoria_id = parser.SubElement(platnosc, "PLAT_KATEGORIA_ID")
+        plat_kategoria_id.text = self.cdata_wrap("")
+        plat_elixir_01 = parser.SubElement(platnosc, "PLAT_ELIXIR_O1")
+        plat_elixir_01.text = self.cdata_wrap(
+            "Zaplata za {}".format(self.invoice_data.at(idx, "Numer"))
+        )
+        plat_elixir_02 = parser.SubElement(platnosc, "PLAT_ELIXIR_O2")
+        plat_elixir_02.text = self.cdata_wrap("")
+        plat_elixir_03 = parser.SubElement(platnosc, "PLAT_ELIXIR_O3")
+        plat_elixir_03.text = self.cdata_wrap("")
+        plat_elixir_04 = parser.SubElement(platnosc, "PLAT_ELIXIR_O4")
+        plat_elixir_04.text = self.cdata_wrap("")
+
+        return invoice
+
+    def get_clients_data(self):
+        """
+        Returns a DataFrame with exported client data
+        from Excel invoices.
+        """
+        return self.clients
+
+    def verify_data(self):
+        """
+        Check exported data for common mistakes.
+        """
+        raise NotImplementedError

@@ -89,10 +89,10 @@ class Delegations(XMLParser):
         numer_obcy.text = self.cdata_wrap(row._4)
         rejestr = parser.SubElement(delegation, "REJESTR")
         rejestr.text = self.cdata_wrap("KOSZTY")
-        typ_podmiotu = parser.SubElement(delegation, "TYP_PODMIOTU")
-        typ_podmiotu.text = self.cdata_wrap("pracownik")
 
         # employee's data
+        typ_podmiotu = parser.SubElement(delegation, "TYP_PODMIOTU")
+        typ_podmiotu.text = self.cdata_wrap("pracownik")
         podmiot = parser.SubElement(delegation, "PODMIOT")
         podmiot.text = self.cdata_wrap(row._0)
         podmiot_id = parser.SubElement(delegation, "PODMIOT_ID")

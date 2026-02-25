@@ -6,9 +6,12 @@ from abc import ABC, abstractmethod
 class XMLParser(ABC):
     """Abstract class with all methods needed for generating optima xmls"""
 
-    def __init__(self, company_code: str, data_path: str):
+    def __init__(
+        self, company_code: str, data_path: str, max_records: int = 0
+    ):
         self.company_code = company_code
         self.data_path = data_path
+        self.max_records = max_records
 
         # set up the root of the document
         self.root = parser.Element("ROOT")
@@ -20,6 +23,9 @@ class XMLParser(ABC):
 
     @abstractmethod
     def gen_xml_layout(self):
+        pass
+
+    def split_xml(self):
         pass
 
     def formatted_print(self):
