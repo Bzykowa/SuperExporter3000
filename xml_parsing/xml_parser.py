@@ -16,6 +16,8 @@ class XMLParser(ABC):
         # set up the root of the document
         self.root = parser.Element("ROOT")
         self.root.set("xmlns", "http://www.comarch.pl/cdn/optima/offline")
+        # if needed can split root info smaller xmls
+        self.split = []
 
     @abstractmethod
     def read_data(self):
@@ -25,13 +27,32 @@ class XMLParser(ABC):
     def gen_xml_layout(self):
         pass
 
-    def split_xml(self):
+    def split_xml(self, max_records: int):
+        """
+        Split one big xml file into smaller chunks with maximum number of
+        records in one file equal to max_records.
+
+        :param max_records: a limit for children in a single file
+        :type max_records: int
+        """
         pass
 
     def formatted_print(self):
         """
-        Return a pretty-printed XML string for the Element.
+        Return a pretty-printed XML string or a list of them.
         """
+        if self.split:
+            xmls = []
+            for elem in self.split:
+                rough_string = parser.tostring(elem, 'utf-8')
+                reparsed = minidom.parseString(rough_string)
+                final = reparsed.toprettyxml(indent="  ")
+                final = final.replace("&lt;", "<")
+                final = final.replace("&gt;", ">")
+                xmls.append(final)
+            if xmls:
+                return xmls
+
         rough_string = parser.tostring(self.root, 'utf-8')
         reparsed = minidom.parseString(rough_string)
         final = reparsed.toprettyxml(indent="  ")

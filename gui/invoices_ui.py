@@ -93,10 +93,23 @@ class InvoicesUI(tk.Frame):
         )
         exporter.verify_data()
         exporter.gen_xml_layout()
-
-        # print(exchange)
-        # print(holidays)
-        # print(companies)
-        # print(path)
-
-        
+        exporter.split_xml(max_records=500)
+        output = exporter.formatted_print()
+        if isinstance(output, list):
+            for idx in range(len(output)):
+                output_path = str(
+                    path.joinpath(
+                        "export_{}{}.xml".format(code, idx)
+                    ).resolve()
+                )
+                with open(output_path, "wb") as out:
+                    out.write(output[idx].encode('utf-8'))
+        elif isinstance(output, str):
+            output_path = str(
+                path.joinpath(
+                    "export_{}.xml".format(code)
+                ).resolve()
+            )
+            with open(output_path, "wb") as out:
+                out.write(output.encode('utf-8'))
+       
