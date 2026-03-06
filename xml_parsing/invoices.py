@@ -1,4 +1,6 @@
 import pandas as pd
+import pathlib
+import re
 import xml.etree.ElementTree as parser
 from xml_parsing.xml_parser import XMLParser
 
@@ -9,7 +11,7 @@ class Invoices(XMLParser):
 
     def __init__(
         self, company_code: str, data_path: str,
-        exchange_rates: dict, holidays: list
+        exchange_rates: dict, holidays: list, month: int
     ):
         """
         Invoices parser constructor
@@ -22,6 +24,8 @@ class Invoices(XMLParser):
         :type exchange_rates: dict
         :param holidays: A list of dates for holidays (no exchange rate)
         :type holidays: list
+        :param month: Number of the month of the invoices batch
+        :type month: int
         """
         super().__init__(company_code, data_path)
         self.client_data = pd.DataFrame(
@@ -40,12 +44,14 @@ class Invoices(XMLParser):
         )
         self.invoice_data = pd.DataFrame(
             columns=[
-                "Numer", "DataWystawienia", "Kwota",
+                "IdFolder", "Numer", "DataWystawienia", "Kwota",
                 "KwotaEUR", "DataKursu"
             ]
         )
         self.exchange_data = exchange_rates
         self.holiday_data = holidays
+        self.month = month
+        self.errors = []
 
         self.read_data()
 
@@ -53,6 +59,137 @@ class Invoices(XMLParser):
         """
         Extract data from invoices (Excel files in data_path directory)
         """
+        # search for modern excel files
+        files = [
+            str(p.resolve()) for p in self.data_path.glob("^[0-9].*.xlsx$")
+        ]
+
+        # process invoices file by file
+        for file in files:
+            invoice = pd.ExcelFile(file)
+            client_record = {}
+            invoice_record = {}
+            # read data and process it
+            # get the number and client code from file name 00 xxxx.xlsx
+            data_file_name = (pathlib.Path(file).name).split(" ", maxsplit=1)
+            invoice_record["IdFolder"] = data_file_name[0]
+            client_record["Kod"] = data_file_name[1][:-5]
+
+            # excel data
+            # join split combo for double space removal
+            client_record["Nazwa"] = " ".join(invoice.book.active.cell(
+                row=12, column=7).value.strip().split())
+            # regex is for spliting on , . and whitespace,
+            # there will be errors anyway
+            address1 = re.split(r'[,\.\s]+', invoice.book.active.cell(
+                row=13, column=7).value.strip())
+            # normal case, house number at the end (Kakestrasse 10)
+            if any(char.isdigit() for char in address1[-1]):
+                client_record["Ulica"] = " ".join(address1[:-1])
+                client_record["NrDomu"] = address1[-1]
+            # whitespace/,/. between house num and letter (Kakestrasse 10 A)
+            elif any(char.isdigit() for char in address1[-2]):
+                client_record["Ulica"] = " ".join(address1[:-2])
+                client_record["NrDomu"] = " ".join(address1[-2:])
+            # too verbose or too short address, impossible to predict the split
+            # (Kakestrasse 10 A Stock 69. (Haus am See))
+            else:
+                client_record["Ulica"] = " ".join(address1)
+                client_record["NrDomu"] = ""
+            address2 = invoice.book.active.cell(
+                row=14, column=7).value.strip().split(" ")
+            if any(char.isdigit() for char in address2[0]):
+                client_record["Miasto"] = " ".join(address1[1:])
+                client_record["KodPocztowy"] = address2[0]
+
+            client_record["Kraj"] = "Niemcy"
+            client_record["OsobaFizyczna"] = 0
+            client_record["PlatnikVAT"] = 1
+            client_record["PodatnikVatCzynny"] = 1
+            client_record["Eksport"] = 0
+            client_record["LimitKredytu"] = 0
+            client_record["Termin"] = 7
+            client_record["FormaPlatnosci"] = "przelew"
+            client_record["Ceny"] = 0
+            client_record["CenyNazwa"] = "domyślna"
+            client_record["Upust"] = 0
+            client_record["NieNaliczajOdsetek"] = 0
+            client_record["MetodaKasowa"] = 0
+            client_record["AlgorytmNettoBrutto"] = 0
+
+            invoice_record["DataWystawienia"] = self.read_date(
+                invoice.book.active.cell(row=4, column=11).value
+            )
+            # date of return of first employee
+            powrot1 = self.read_date(
+                invoice.book.active.cell(row=20, column=6).value
+            )
+            # date of return of second employee
+            powrot2 = self.read_date(
+                invoice.book.active.cell(row=27, column=6).value
+            )
+
+            # exchange date is minimum of
+            # max(powrot1, powrot2) and datawystawienia - 1 if months match
+            # else datawystawienia - 1
+            # if no rate for the day (sunday, saturday, holidays)
+            # go back 1 day and check again
+            if pd.isnull(powrot2) and not pd.isnull(powrot1):
+                invoice_record["DataKursu"] = self.set_exchange_date(
+                    powrot1
+                ) if (powrot1 < invoice_record["DataWystawienia"]
+                      and powrot1.month == self.month) else \
+                    self.set_exchange_date(
+                        invoice_record["DataWystawienia"]
+                )
+            elif not pd.isnull(powrot2) and not pd.isnull(powrot1):
+                powrot = powrot1 if powrot1 > powrot2 else powrot2
+                invoice_record["DataKursu"] = self.set_exchange_date(
+                    powrot
+                ) if (powrot < invoice_record["DataWystawienia"]
+                      and powrot.month == self.month) else \
+                    self.set_exchange_date(
+                        invoice_record["DataWystawienia"]
+                )
+            else:
+                invoice_record["DataKursu"] = pd.NaT \
+                    if pd.isnull(invoice_record["DataWystawienia"]) else \
+                    self.set_exchange_date(
+                        invoice_record["DataWystawienia"]
+                )
+
+            invoice_record["Numer"] = invoice.book.active.cell(
+                row=3, column=11).value
+
+            # checking data integrity
+            dw_null = pd.isnull(invoice_record["DataWystawienia"])
+            dk_null = pd.isnull(invoice_record["DataKursu"])
+            if dw_null:
+                self.errors.append(
+                    "{} : Brak daty wystawienia / nieparsowalna".format(
+                        pathlib.Path(file).name))
+            if (not dw_null and
+                    invoice_record["DataWystawienia"].month != self.month):
+                self.errors.append(
+                    "{} : Data wystawienia nie z miesiąca {}".format(
+                        pathlib.Path(file).name, self.month)
+                )
+            if dk_null:
+                self.errors.append(
+                    "{} : Nie można ustalić daty kursu".format(
+                        pathlib.Path(file).name))
+            if not dk_null:
+                try:
+                    exchange_idx = invoice_record["DataKursu"].strftime(
+                        "%Y-%m-%d")
+                except KeyError:
+                    self.errors.append(
+                        "{} : Brak kursu na dzień {}".format(
+                            pathlib.Path(file).name, exchange_idx))
+
+            self.client_data.loc[len(self.client_data)] = client_record
+            self.invoice_data.loc[len(self.invoice_data)] = invoice_record
+
         self.verify_data()
         raise NotImplementedError
 
@@ -400,6 +537,33 @@ class Invoices(XMLParser):
 
     def verify_data(self):
         """
-        Check exported data for common mistakes.
+        Return a list of errors found during data load.
         """
-        raise NotImplementedError
+        return self.errors
+
+    def read_date(data):
+        """
+        Helper function to read dates from Excel in a proper format.
+        Errors will return NaT.
+
+        :param data: Value to cast to pandas.Timestamp
+        """
+        if isinstance(data, pd.Timestamp):
+            return data
+        else:
+            return pd.to_datetime(data, errors="coerce")
+
+    def set_exchange_date(self, date: pd.Timestamp):
+        """
+        Docstring for set_exchange_date
+
+        :param date: Start date from which the exchange date is calculated
+        :type date: pd.Timestamp
+        """
+        exchange = date - pd.Timedelta(days=1)
+
+        while (exchange.weekday() == 6 or exchange.weekday() == 5 or
+               exchange.strftime("%Y-%m-%d") in self.holiday_data):
+            exchange = exchange - pd.Timedelta(days=1)
+
+        return exchange

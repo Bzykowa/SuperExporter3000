@@ -3,6 +3,7 @@ import pandas as pd
 import config.utils as cfg
 import pathlib
 from tkinter.filedialog import askdirectory
+from tkinter.ttk import Combobox
 from tkcalendar import DateEntry
 
 from xml_parsing.invoices import Invoices
@@ -15,12 +16,16 @@ class InvoicesUI(tk.Frame):
     def __init__(self, master=None, controller=None):
         super().__init__(master)
         self.controller = controller
-        self.rowconfigure((0, 1, 2), weight=1)
+        self.rowconfigure((0, 1, 2, 3, 4), weight=1)
         self.columnconfigure((0, 1, 2), weight=1)
         self.setup()
 
     def setup(self):
         """Shape the menu component"""
+        # month choice setup
+        months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        self.month = tk.IntVar(self)
+        self.month.set(1)
         # Components
         self.lbl_path_to_invs = tk.Label(
             self, text="Nie wybrano folderu", fg="grey")
@@ -35,6 +40,12 @@ class InvoicesUI(tk.Frame):
             self, text="Generuj pliki", state="disabled",
             command=self.generate_xml_and_clients
         )
+        self.btn_check_inv = tk.Button(
+            self, text="Sprawdź pliki", state="disabled",
+            command=self.check_invoices
+        )
+        self.month_choice = Combobox(self, values=months)
+        self.lbl_month = tk.Label(self, text="Wybierz miesiąc")
         # Placement
         self.lbl_path_to_invs.grid(
             row=0, column=0, sticky="w", padx=10, pady=10)
@@ -49,8 +60,17 @@ class InvoicesUI(tk.Frame):
         self.eur_date_end.grid(
             row=1, column=2, sticky="ew", padx=10, pady=10
         )
-        self.btn_gen_inv.grid(
+        self.lbl_month.grid(
+            row=2, column=0, sticky="w", padx=10, pady=10
+        )
+        self.month_choice.grid(
             row=2, column=2, sticky="ew", padx=10, pady=10
+        )
+        self.btn_check_inv.grid(
+            row=3, column=2, sticky="ew", padx=10, pady=10
+        )
+        self.btn_gen_inv.grid(
+            row=4, column=2, sticky="ew", padx=10, pady=10
         )
 
     def get_path(self):
@@ -62,11 +82,15 @@ class InvoicesUI(tk.Frame):
             return
 
         self.lbl_path_to_invs["text"] = f"{filepath}"
-        self.btn_gen_inv["state"] = "active"
+        self.btn_check_inv["state"] = "active"
+        self.btn_check_inv["state"] = "disabled"
 
-    def generate_xml_and_clients(self):
-        """Create xml file with invoices data extracted from submitted Excel
-        files and xls file with client data."""
+    def check_invoices(self):
+        """
+        Load invoices and check for known errors.
+        If no errors, enable file generation.
+
+        """
         # idea: add config with paths to companies for multi company export
         path = pathlib.Path(self.lbl_path_to_invs["text"])
 
@@ -78,28 +102,39 @@ class InvoicesUI(tk.Frame):
         companies = cfg.load_companies()
         holidays = cfg.load_holidays()
 
-        code = ""
+        self.code = ""
         # get the company code
         for i in range(len(companies)):
             if companies[i]["name"].casefold() in str(path.resolve()):
                 code = companies[i]["id"]
                 break
 
-        exporter = Invoices(
+        self.exporter = Invoices(
             company_code=code,
             data_path=str(path.resolve()),
             exchange_rates=exchange,
-            holidays=holidays
+            holidays=holidays,
+            month=self.month.get()
         )
-        exporter.verify_data()
-        exporter.gen_xml_layout()
-        exporter.split_xml(max_records=500)
-        output = exporter.formatted_print()
+        errors = self.exporter.verify_data()
+
+        if not errors:
+            self.btn_gen_inv["state"] = "active"
+
+    def generate_xml_and_clients(self):
+        """Create xml file with invoices data extracted from submitted Excel
+        files and xls file with client data."""
+
+        path = pathlib.Path(self.lbl_path_to_invs["text"])
+
+        self.exporter.gen_xml_layout()
+        self.exporter.split_xml(max_records=500)
+        output = self.exporter.formatted_print()
         if isinstance(output, list):
             for idx in range(len(output)):
                 output_path = str(
                     path.joinpath(
-                        "export_{}{}.xml".format(code, idx)
+                        "export_{}{}.xml".format(self.code, idx)
                     ).resolve()
                 )
                 with open(output_path, "wb") as out:
@@ -107,9 +142,8 @@ class InvoicesUI(tk.Frame):
         elif isinstance(output, str):
             output_path = str(
                 path.joinpath(
-                    "export_{}.xml".format(code)
+                    "export_{}.xml".format(self.code)
                 ).resolve()
             )
             with open(output_path, "wb") as out:
                 out.write(output.encode('utf-8'))
-       
