@@ -83,7 +83,7 @@ class InvoicesUI(tk.Frame):
 
         self.lbl_path_to_invs["text"] = f"{filepath}"
         self.btn_check_inv["state"] = "active"
-        self.btn_check_inv["state"] = "disabled"
+        self.btn_gen_inv["state"] = "disabled"
 
     def check_invoices(self):
         """
@@ -101,16 +101,17 @@ class InvoicesUI(tk.Frame):
         )
         companies = cfg.load_companies()
         holidays = cfg.load_holidays()
-
+        print(companies)
         self.code = ""
         # get the company code
         for i in range(len(companies)):
-            if companies[i]["name"].casefold() in str(path.resolve()):
-                code = companies[i]["id"]
+            if companies[i]["name"].casefold() in str(
+                    path.resolve()).casefold():
+                self.code = companies[i]["id"]
                 break
-
+        print(self.code)
         self.exporter = Invoices(
-            company_code=code,
+            company_code=self.code,
             data_path=str(path.resolve()),
             exchange_rates=exchange,
             holidays=holidays,
