@@ -2,6 +2,7 @@ import tkinter as tk
 import pandas as pd
 import config.utils as cfg
 import pathlib
+import pyexcel
 from tkinter.filedialog import askdirectory
 from tkinter.ttk import Combobox
 from tkcalendar import DateEntry
@@ -101,7 +102,7 @@ class InvoicesUI(tk.Frame):
         )
         companies = cfg.load_companies()
         holidays = cfg.load_holidays()
-        print(companies)
+
         self.code = ""
         # get the company code
         for i in range(len(companies)):
@@ -109,7 +110,7 @@ class InvoicesUI(tk.Frame):
                     path.resolve()).casefold():
                 self.code = companies[i]["id"]
                 break
-        print(self.code)
+
         self.exporter = Invoices(
             company_code=self.code,
             data_path=str(path.resolve()),
@@ -121,6 +122,8 @@ class InvoicesUI(tk.Frame):
 
         if not errors:
             self.btn_gen_inv["state"] = "active"
+        else:
+            print(errors)
 
     def generate_xml_and_clients(self):
         """Create xml file with invoices data extracted from submitted Excel
@@ -148,3 +151,21 @@ class InvoicesUI(tk.Frame):
             )
             with open(output_path, "wb") as out:
                 out.write(output.encode('utf-8'))
+
+        # bullshit to export df to .xls
+        clients = self.exporter.get_clients_data()
+        csv = str(path.joinpath("kontrahenci.csv").resolve())
+        xls = str(path.joinpath("Kontrahenci.xls").resolve())
+        clients.to_csv(csv, columns=[
+            "Kod", "Nazwa", "Nazwa2", "Nazwa3", "Telefon", "Telefon2",
+            "TelefonSms", "Fax", "Ulica", "NrDomu", "NrLokalu",
+            "KodPocztowy", "Poczta", "Miasto", "Kraj", "Wojewodztwo",
+            "Powiat", "Gmina", "URL", "Grupa", "OsobaFizyczna", "NIP",
+            "NIPKraj", "Zezwolenie", "Regon", "Pesel", "Email",
+            "BankRachunekNr", "BankNazwa", "Osoba", "Opis", "Rodzaj",
+            "PlatnikVAT", "PodatnikVatCzynny", "Eksport", "LimitKredytu",
+            "Termin", "FormaPlatnosci", "Ceny", "CenyNazwa", "Upust",
+            "NieNaliczajOdsetek", "MetodaKasowa", "WindykacjaEMail",
+            "WindykacjaTelefonSms", "AlgorytmNettoBrutto", "Waluta"
+        ], index=False)
+        pyexcel.save_as(file_name=csv, dest_file_name=xls)

@@ -557,7 +557,7 @@ class Invoices(XMLParser):
         Returns a DataFrame with exported client data
         from Excel invoices.
         """
-        return self.clients
+        return self.client_data
 
     def verify_data(self):
         """
