@@ -18,16 +18,26 @@ class Delegations(XMLParser):
                 0: str, 1: str}, thousands=" "
         )
         # date casting bullshit
-        self.data[9] = pd.to_datetime(self.data[9], format="mixed")
-        self.data[10] = pd.to_datetime(self.data[10], format="mixed")
-        self.data[16] = pd.to_datetime(self.data[16], format="mixed")
-        self.data[17] = pd.to_datetime(self.data[17], format="mixed")
-        self.data[18] = pd.to_datetime(self.data[18], format="mixed")
-        self.data[19] = pd.to_datetime(self.data[19], format="mixed")
-        self.data[20] = pd.to_datetime(self.data[20], format="mixed")
-        self.data[21] = pd.to_datetime(self.data[21], format="mixed")
-        self.data[36] = pd.to_datetime(self.data[36], format="mixed")
-        self.data[38] = pd.to_datetime(self.data[38], format="mixed")
+        self.data[9] = pd.to_datetime(
+            self.data[9], format="mixed", errors="coerce")
+        self.data[10] = pd.to_datetime(
+            self.data[10], format="mixed", errors="coerce")
+        self.data[16] = pd.to_datetime(
+            self.data[16], format="mixed", errors="coerce")
+        self.data[17] = pd.to_datetime(
+            self.data[17], format="mixed", errors="coerce")
+        self.data[18] = pd.to_datetime(
+            self.data[18], format="mixed", errors="coerce")
+        self.data[19] = pd.to_datetime(
+            self.data[19], format="mixed", errors="coerce")
+        self.data[20] = pd.to_datetime(
+            self.data[20], format="mixed", errors="coerce")
+        self.data[21] = pd.to_datetime(
+            self.data[21], format="mixed", errors="coerce")
+        self.data[36] = pd.to_datetime(
+            self.data[36], format="mixed", errors="coerce")
+        self.data[38] = pd.to_datetime(
+            self.data[38], format="mixed", errors="coerce")
 
     def gen_xml_layout(self):
         """
