@@ -2,6 +2,7 @@ import pandas as pd
 import pathlib
 import re
 import xml.etree.ElementTree as parser
+from math import ceil
 from xml_parsing.xml_parser import XMLParser
 
 
@@ -51,7 +52,7 @@ class Invoices(XMLParser):
         )
         self.exchange_data = exchange_rates
         self.holiday_data = holidays
-        self.month = month
+        self.month = int(month)
         self.errors = []
 
         self.read_data()
@@ -81,11 +82,11 @@ class Invoices(XMLParser):
 
             # excel data
             # join split combo for double space removal
-            client_record["Nazwa"] = " ".join(invoice.book.active.cell(
+            client_record["Nazwa"] = " ".join(invoice.book["Tabelle1"].cell(
                 row=12, column=7).value.strip().split())
             # regex is for spliting on , . and whitespace,
             # there will be errors anyway
-            address1 = re.split(r'[,\.\s]+', invoice.book.active.cell(
+            address1 = re.split(r'[,\.\s]+', invoice.book["Tabelle1"].cell(
                 row=13, column=7).value.strip())
             # normal case, house number at the end (Kakestrasse 10)
             if any(char.isdigit() for char in address1[-1]):
@@ -100,7 +101,7 @@ class Invoices(XMLParser):
             else:
                 client_record["Ulica"] = (" ".join(address1)).strip()
                 client_record["NrDomu"] = ""
-            address2 = invoice.book.active.cell(
+            address2 = invoice.book["Tabelle1"].cell(
                 row=14, column=7).value.strip().split(" ")
             if any(char.isdigit() for char in address2[0]):
                 client_record["Miasto"] = (" ".join(address2[1:])).strip()
@@ -122,15 +123,15 @@ class Invoices(XMLParser):
             client_record["AlgorytmNettoBrutto"] = 0
 
             invoice_record["DataWystawienia"] = self.read_date(
-                invoice.book.active.cell(row=4, column=11).value
+                invoice.book["Tabelle1"].cell(row=4, column=11).value
             )
             # date of return of first employee
             powrot1 = self.read_date(
-                invoice.book.active.cell(row=20, column=6).value
+                invoice.book["Tabelle1"].cell(row=20, column=6).value
             )
             # date of return of second employee
             powrot2 = self.read_date(
-                invoice.book.active.cell(row=27, column=6).value
+                invoice.book["Tabelle1"].cell(row=27, column=6).value
             )
 
             # exchange date is minimum of
@@ -162,15 +163,17 @@ class Invoices(XMLParser):
                         invoice_record["DataWystawienia"]
                 )
 
-            invoice_record["Numer"] = invoice.book.active.cell(
+            invoice_record["Numer"] = invoice.book["Tabelle1"].cell(
                 row=3, column=11).value
 
-            if invoice.book.active.cell(row=39, column=11).value == 0:
-                invoice_record["KwotaEUR"] = round(invoice.book.active.cell(
-                    row=40, column=11).value, 2)
+            if invoice.book["Tabelle1"].cell(row=39, column=11).value == 0:
+                invoice_record["KwotaEUR"] = round(
+                    invoice.book["Tabelle1"].cell(
+                        row=40, column=11).value, 2)
             else:
-                invoice_record["KwotaEUR"] = round(invoice.book.active.cell(
-                    row=37, column=11).value, 2)
+                invoice_record["KwotaEUR"] = round(
+                    invoice.book["Tabelle1"].cell(
+                        row=37, column=11).value, 2)
 
             # checking data integrity
             dw_null = pd.isnull(invoice_record["DataWystawienia"])
@@ -179,8 +182,8 @@ class Invoices(XMLParser):
                 self.errors.append(
                     "{} : Brak daty wystawienia / nieparsowalna".format(
                         pathlib.Path(file).name))
-            if (not dw_null and
-                    invoice_record["DataWystawienia"].month != self.month):
+            if ((not dw_null) and
+                    (invoice_record["DataWystawienia"].month != self.month)):
                 self.errors.append(
                     "{} : Data wystawienia nie z miesiąca {}".format(
                         pathlib.Path(file).name, self.month)
@@ -221,7 +224,6 @@ class Invoices(XMLParser):
         """
         Generate the layout for invoice records.
         """
-        # todo: figure out how to make many files (max_record = 500)
         self.records = parser.SubElement(self.root, "REJESTRY_SPRZEDAZY_VAT")
         self.records.set("xmlns", "")
 
@@ -232,12 +234,12 @@ class Invoices(XMLParser):
         doc_id = parser.SubElement(self.records, "BAZA_DOC_ID")
         doc_id.text = self.cdata_wrap(self.company_code)
 
-        invoices = [
+        self.invoices = [
             self.gen_invoice_record(idx)
             for idx in range(len(self.invoice_data))
         ]
 
-        self.records.extend(invoices)
+        self.records.extend(self.invoices)
 
     def gen_invoice_record(self, idx: int):
         """
@@ -610,3 +612,37 @@ class Invoices(XMLParser):
                     "{} : nie ma faktury".format(i)
                 )
             j += 1
+
+    def split_xml(self, max_records):
+        """
+        Split one big xml file into smaller chunks with maximum number of
+        records in one file equal to max_records.
+
+        :param max_records: a limit for children in a single file
+        :type max_records: int
+        """
+
+        if max_records >= len(self.invoices):
+            return
+
+        file_num = ceil(len(self.invoices) / max_records)
+
+        for i in range(0, file_num):
+            # set up the layout of the split document
+            root = parser.Element("ROOT")
+            root.set("xmlns", "http://www.comarch.pl/cdn/optima/offline")
+            records = parser.SubElement(root, "REJESTRY_SPRZEDAZY_VAT")
+            records.set("xmlns", "")
+            version = parser.SubElement(records, "WERSJA")
+            version.text = self.cdata_wrap("2.00")
+            zdr_id = parser.SubElement(records, "BAZA_ZRD_ID")
+            zdr_id.text = self.cdata_wrap(self.company_code)
+            doc_id = parser.SubElement(records, "BAZA_DOC_ID")
+            doc_id.text = self.cdata_wrap(self.company_code)
+
+            inv_slice = self.invoices[
+                i * max_records:max((i+1)*max_records, len(self.invoices))
+            ]
+            records.extend(inv_slice)
+
+            self.split.append(root)

@@ -1,5 +1,6 @@
 import pandas as pd
 import xml.etree.ElementTree as parser
+from math import ceil
 from xml_parsing.xml_parser import XMLParser
 
 
@@ -59,9 +60,9 @@ class Delegations(XMLParser):
         ]
 
         # filter rows with no client
-        out = [d for d in delegations if d is not None]
+        self.delegations = [d for d in delegations if d is not None]
 
-        self.records.extend(out)
+        self.records.extend(self.delegations)
 
     def gen_delegation_xml(self, row: tuple):
         """
@@ -273,3 +274,36 @@ class Delegations(XMLParser):
             return (date - pd.Timedelta(days=3)).strftime("%d.%m.%Y")
         else:
             return (date - pd.Timedelta(days=1)).strftime("%d.%m.%Y")
+
+    def split_xml(self, max_records):
+        """
+        Split one big xml file into smaller chunks with maximum number of
+        records in one file equal to max_records.
+
+        :param max_records: a limit for children in a single file
+        :type max_records: int
+        """
+        if max_records >= len(self.delegations):
+            return
+
+        file_num = ceil(len(self.invoices) / max_records)
+
+        for i in range(0, file_num):
+            # set up the layout of the split document
+            root = parser.Element("ROOT")
+            root.set("xmlns", "http://www.comarch.pl/cdn/optima/offline")
+            records = parser.SubElement(root, "DOKUMENTY_INNE_ROZCHOD")
+            records.set("xmlns", "")
+            version = parser.SubElement(records, "WERSJA")
+            version.text = self.cdata_wrap("2.00")
+            zdr_id = parser.SubElement(records, "BAZA_ZRD_ID")
+            zdr_id.text = self.cdata_wrap(self.company_code)
+            doc_id = parser.SubElement(records, "BAZA_DOC_ID")
+            doc_id.text = self.cdata_wrap(self.company_code)
+
+            del_slice = self.delegations[
+                i * max_records:max((i+1)*max_records, len(self.delegations))
+            ]
+            records.extend(del_slice)
+
+            self.split.append(root)

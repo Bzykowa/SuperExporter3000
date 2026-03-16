@@ -7,11 +7,10 @@ class XMLParser(ABC):
     """Abstract class with all methods needed for generating optima xmls"""
 
     def __init__(
-        self, company_code: str, data_path: str, max_records: int = 0
+        self, company_code: str, data_path: str
     ):
         self.company_code = company_code
         self.data_path = data_path
-        self.max_records = max_records
 
         # set up the root of the document
         self.root = parser.Element("ROOT")
@@ -27,14 +26,8 @@ class XMLParser(ABC):
     def gen_xml_layout(self):
         pass
 
+    @abstractmethod
     def split_xml(self, max_records: int):
-        """
-        Split one big xml file into smaller chunks with maximum number of
-        records in one file equal to max_records.
-
-        :param max_records: a limit for children in a single file
-        :type max_records: int
-        """
         pass
 
     def formatted_print(self):

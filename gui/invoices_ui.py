@@ -25,8 +25,7 @@ class InvoicesUI(tk.Frame):
         """Shape the menu component"""
         # month choice setup
         months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-        self.month = tk.IntVar(self)
-        self.month.set(1)
+
         # Components
         self.lbl_path_to_invs = tk.Label(
             self, text="Nie wybrano folderu", fg="grey")
@@ -116,7 +115,7 @@ class InvoicesUI(tk.Frame):
             data_path=str(path.resolve()),
             exchange_rates=exchange,
             holidays=holidays,
-            month=self.month.get()
+            month=self.month_choice.get()
         )
         errors = self.exporter.verify_data()
 
