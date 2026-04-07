@@ -42,8 +42,10 @@ class Invoices(XMLParser):
                 "Termin", "FormaPlatnosci", "Ceny", "CenyNazwa", "Upust",
                 "NieNaliczajOdsetek", "MetodaKasowa", "WindykacjaEMail",
                 "WindykacjaTelefonSms", "AlgorytmNettoBrutto", "Waluta"
-            ]
+            ],
+            dtype=str
         )
+        self.client_data.astype({"IdFolder": int})
         self.invoice_data = pd.DataFrame(
             columns=[
                 "IdFolder", "Numer", "DataWystawienia", "Kwota",
@@ -71,7 +73,24 @@ class Invoices(XMLParser):
         # process invoices file by file
         for file in files:
             invoice = pd.ExcelFile(file)
-            client_record = {}
+            client_record = {
+                "IdFolder": 0,
+                "Kod": "", "Nazwa": "", "Nazwa2": "", "Nazwa3": "",
+                "Telefon": "", "Telefon2": "", "TelefonSms": "",
+                "Fax": "", "Ulica": "", "NrDomu": "", "NrLokalu": "",
+                "KodPocztowy": "", "Poczta": "", "Miasto": "", "Kraj": "",
+                "Wojewodztwo": "", "Powiat": "", "Gmina": "", "URL": "",
+                "Grupa": "", "OsobaFizyczna": "", "NIP": "", "NIPKraj": "",
+                "Zezwolenie": "", "Regon": "", "Pesel": "", "Email": "",
+                "BankRachunekNr": "", "BankNazwa": "", "Osoba": "",
+                "Opis": "", "Rodzaj": "", "PlatnikVAT": "",
+                "PodatnikVatCzynny": "", "Eksport": "", "LimitKredytu": "",
+                "Termin": "", "FormaPlatnosci": "", "Ceny": "",
+                "CenyNazwa": "", "Upust": "", "NieNaliczajOdsetek": "",
+                "MetodaKasowa": "", "WindykacjaEMail": "",
+                "WindykacjaTelefonSms": "", "AlgorytmNettoBrutto": "",
+                "Waluta": ""
+            }
             invoice_record = {}
             # read data and process it
             # get the number and client code from file name 00 xxxx.xlsx
@@ -108,19 +127,19 @@ class Invoices(XMLParser):
                 client_record["KodPocztowy"] = address2[0].strip()
 
             client_record["Kraj"] = "Niemcy"
-            client_record["OsobaFizyczna"] = 0
-            client_record["PlatnikVAT"] = 1
-            client_record["PodatnikVatCzynny"] = 1
-            client_record["Eksport"] = 0
-            client_record["LimitKredytu"] = 0
-            client_record["Termin"] = 7
+            client_record["OsobaFizyczna"] = "0"
+            client_record["PlatnikVAT"] = "1"
+            client_record["PodatnikVatCzynny"] = "1"
+            client_record["Eksport"] = "0"
+            client_record["LimitKredytu"] = "0"
+            client_record["Termin"] = "7"
             client_record["FormaPlatnosci"] = "przelew"
-            client_record["Ceny"] = 0
+            client_record["Ceny"] = "0"
             client_record["CenyNazwa"] = "domyślna"
-            client_record["Upust"] = 0
-            client_record["NieNaliczajOdsetek"] = 0
-            client_record["MetodaKasowa"] = 0
-            client_record["AlgorytmNettoBrutto"] = 0
+            client_record["Upust"] = "0"
+            client_record["NieNaliczajOdsetek"] = "0"
+            client_record["MetodaKasowa"] = "0"
+            client_record["AlgorytmNettoBrutto"] = "0"
 
             invoice_record["DataWystawienia"] = self.read_date(
                 invoice.book["Tabelle1"].cell(row=4, column=11).value
@@ -212,8 +231,7 @@ class Invoices(XMLParser):
             self.client_data.loc[len(self.client_data)] = client_record
             self.invoice_data.loc[len(self.invoice_data)] = invoice_record
 
-        # fill empty values with empty str, sort numerically
-        self.client_data.fillna("", inplace=True)
+        # sort numerically
         self.client_data.sort_values(by=["IdFolder"], inplace=True)
         self.invoice_data.sort_values(by=["IdFolder"], inplace=True)
         self.client_data.reset_index(drop=True, inplace=True)
