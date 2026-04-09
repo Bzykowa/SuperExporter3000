@@ -659,7 +659,7 @@ class Invoices(XMLParser):
             doc_id.text = self.cdata_wrap(self.company_code)
 
             inv_slice = self.invoices[
-                i * max_records:max((i+1)*max_records, len(self.invoices))
+                i * max_records:min((i+1)*max_records, len(self.invoices))
             ]
             records.extend(inv_slice)
 

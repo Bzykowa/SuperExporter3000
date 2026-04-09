@@ -302,7 +302,7 @@ class Delegations(XMLParser):
             doc_id.text = self.cdata_wrap(self.company_code)
 
             del_slice = self.delegations[
-                i * max_records:max((i+1)*max_records, len(self.delegations))
+                i * max_records:min((i+1)*max_records, len(self.delegations))
             ]
             records.extend(del_slice)
 
